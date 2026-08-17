@@ -442,6 +442,144 @@ def sanitize_email(email: str) -> str:
 # XP / LEVEL SYSTEM
 # ============================================================
 
+
+# ============================================================
+# NAMED ACHIEVEMENT BADGES
+# ============================================================
+
+
+# ============================================================
+# ACHIEVEMENT DEFINITIONS
+# ============================================================
+
+ACHIEVEMENT_BADGE_DEFINITIONS = {
+    "first_blood": {
+        "title": "First Blood",
+        "description": "Complete your first game.",
+        "icon": "\U0001F3C6",
+        "rarity": "COMMON",
+        "target": 1,
+        "metric": "games",
+    },
+    "rising_star": {
+        "title": "Rising Star",
+        "description": "Reach Level 5.",
+        "icon": "\u26A1",
+        "rarity": "RARE",
+        "target": 5,
+        "metric": "level",
+    },
+    "club_1k": {
+        "title": "1K Club",
+        "description": "Reach 1,000 XP.",
+        "icon": "\U0001F525",
+        "rarity": "EPIC",
+        "target": 1000,
+        "metric": "xp",
+    },
+    "veteran": {
+        "title": "Veteran",
+        "description": "Reach Level 10.",
+        "icon": "\U0001F451",
+        "rarity": "LEGENDARY",
+        "target": 10,
+        "metric": "level",
+    },
+}
+
+
+def get_submitted_game_count(
+    connection,
+    player_id: int,
+) -> int:
+    row = execute_query(
+        connection,
+        """
+        SELECT COUNT(*) AS count
+        FROM game_sessions
+        WHERE player_id = ?
+          AND submitted = ?
+        """,
+        (
+            player_id,
+            False if USE_POSTGRES else 1,
+        ),
+    ).fetchone()
+
+    if row is None:
+        return 0
+
+    return int(row["count"] or 0)
+
+
+def get_achievement_badges(
+    connection,
+    player_id: int,
+    player,
+):
+    xp = max(
+        0,
+        int(player["xp"] or 0),
+    )
+
+    level = max(
+        1,
+        int(player["level"] or 1),
+    )
+
+    submitted_games = get_submitted_game_count(
+        connection,
+        player_id,
+    )
+
+    metrics = {
+        "games": submitted_games,
+        "level": level,
+        "xp": xp,
+    }
+
+    badges = []
+
+    for achievement_key, definition in (
+        ACHIEVEMENT_BADGE_DEFINITIONS.items()
+    ):
+        target = max(
+            1,
+            int(definition["target"]),
+        )
+
+        current = max(
+            0,
+            int(metrics[definition["metric"]]),
+        )
+
+        unlocked = current >= target
+
+        progress_percent = int(
+            min(
+                100,
+                max(
+                    0,
+                    (current * 100) // target,
+                ),
+            )
+        )
+
+        badges.append(
+            {
+                "achievement_key": achievement_key,
+                "title": definition["title"],
+                "description": definition["description"],
+                "icon": definition["icon"],
+                "rarity": definition["rarity"],
+                "current": current,
+                "target": target,
+                "progress_percent": progress_percent,
+                "unlocked": unlocked,
+            }
+        )
+
+    return badges
 def calculate_level(total_xp: int) -> int:
     """
     Level 1 starts at 0 XP.
@@ -463,18 +601,56 @@ def calculate_level(total_xp: int) -> int:
 
 
 def calculate_achievement_count(
-    current_xp: int,
+    connection=None,
+    player_id=None,
+    player=None,
 ) -> int:
     """
-    Temporary achievement calculation.
+    Return the number of currently unlocked named achievements.
 
-    Every 500 XP = 1 achievement.
+    The optional one-argument compatibility path preserves the
+    old 500-XP counter if any legacy code still calls this function
+    with only total XP.
     """
 
-    if current_xp < 0:
-        current_xp = 0
+    # ---------------------------------------------------------
+    # Legacy compatibility:
+    # calculate_achievement_count(total_xp)
+    # ---------------------------------------------------------
 
-    return current_xp // 500
+    if (
+        player is None
+        and player_id is None
+        and (
+            isinstance(connection, int)
+            or isinstance(connection, float)
+        )
+    ):
+        total_xp = max(
+            0,
+            int(connection),
+        )
+
+        return total_xp // 500
+
+    # ---------------------------------------------------------
+    # New achievement system
+    # ---------------------------------------------------------
+
+    if connection is None or player_id is None or player is None:
+        return 0
+
+    badges = get_achievement_badges(
+        connection,
+        player_id,
+        player,
+    )
+
+    return sum(
+        1
+        for badge in badges
+        if badge.get("unlocked") is True
+    )
 
 
 def calculate_xp_from_score(
@@ -761,6 +937,12 @@ def login_player(
                 detail="Invalid email or password.",
             )
 
+        achievement_badges = get_achievement_badges(
+            connection,
+            player["id"],
+            player,
+        )
+
         return {
             "success": True,
             "message": "Login successful!",
@@ -772,6 +954,7 @@ def login_player(
                 "xp": player["xp"],
                 "achievements": player["achievements"],
                 "created_at": player["created_at"],
+                "achievement_badges": achievement_badges,
             },
         }
 
@@ -807,9 +990,18 @@ def get_player(
                 detail="Player not found.",
             )
 
+        achievement_badges = get_achievement_badges(
+            connection,
+            player_id,
+            player,
+        )
+
         return {
             "success": True,
-            "player": dict(player),
+            "player": {
+                **dict(player),
+                "achievement_badges": achievement_badges,
+            },
         }
 
     finally:
@@ -876,10 +1068,14 @@ def add_player_xp(
             new_xp
         )
 
-        new_achievements = (
-            calculate_achievement_count(
-                new_xp
-            )
+        projected_player = dict(player)
+        projected_player["xp"] = new_xp
+        projected_player["level"] = new_level
+
+        new_achievements = calculate_achievement_count(
+            connection,
+            player_id,
+            projected_player,
         )
 
         execute_query(
@@ -907,10 +1103,19 @@ def add_player_xp(
             player_id,
         )
 
+        achievement_badges = get_achievement_badges(
+            connection,
+            player_id,
+            updated_player,
+        )
+
         return {
             "success": True,
             "message": "XP added successfully!",
-            "player": dict(updated_player),
+                        "player": {
+                **dict(updated_player),
+                "achievement_badges": achievement_badges,
+            },
         }
 
     finally:

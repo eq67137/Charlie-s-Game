@@ -5,3 +5,15 @@ backup/
 .venv/
 venv/
 .env
+# Charlie's Game local development backups and updater scripts
+app_before_*.js
+style_before_*.css
+index_before_*.html
+install_*.py
+update_*.py
+upgrade_*.py
+fix_*.py
+backend/add_badges_to_xp_response.py
+backend/migrate_sqlite_to_postgres.py
+backend/server_before_*.py
+backend/upgrade_*.py

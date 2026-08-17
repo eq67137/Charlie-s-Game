@@ -3391,3 +3391,429 @@ footer {
     .game-controls { flex-wrap: wrap; }
     .game-finish-button { margin-left: 0; }
 }
+
+
+/* =========================================================
+   PLAYER PROGRESSION
+   ========================================================= */
+
+.game-level-stat {
+    min-width: 150px;
+}
+
+.game-xp-track {
+    width: 100%;
+    height: 6px;
+    margin-top: 7px;
+    margin-bottom: 5px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.game-xp-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.45s ease;
+    background: currentColor;
+}
+
+#gameXpNext {
+    opacity: 0.65;
+    font-size: 0.68rem;
+}
+
+
+/* LEVEL UP CELEBRATION */
+
+.level-up-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(1.04);
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+
+.level-up-overlay.level-up-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.level-up-card {
+    min-width: 280px;
+    padding: 28px 34px;
+    text-align: center;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(8, 10, 18, 0.94);
+    box-shadow:
+        0 20px 80px rgba(0, 0, 0, 0.55),
+        0 0 40px rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(12px);
+}
+
+.level-up-kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    font-weight: 700;
+    opacity: 0.7;
+    margin-bottom: 8px;
+}
+
+.level-up-title {
+    font-size: clamp(2rem, 6vw, 4rem);
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+}
+
+.level-up-subtitle {
+    margin-top: 12px;
+    font-size: 1rem;
+    opacity: 0.72;
+}
+
+
+
+/* =========================================================
+   PLAYER PROFILE
+   ========================================================= */
+
+.player-profile-section {
+    width: min(1100px, calc(100% - 32px));
+    margin: 32px auto;
+}
+
+.profile-card {
+    padding: 28px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(8, 10, 18, 0.86);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(12px);
+}
+
+.profile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.profile-kicker {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    opacity: 0.58;
+}
+
+.profile-header h2,
+.profile-achievements-header h3 {
+    margin: 6px 0 4px;
+}
+
+.profile-player-id {
+    opacity: 0.55;
+    font-size: 0.8rem;
+}
+
+.profile-logout {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 9px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    color: inherit;
+    cursor: pointer;
+}
+
+.profile-stats {
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.profile-stat {
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.profile-stat span {
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    opacity: 0.55;
+}
+
+.profile-stat strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 1.25rem;
+}
+
+.profile-contact {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-top: 18px;
+}
+
+.profile-contact span {
+    opacity: 0.55;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+}
+
+.profile-achievements {
+    margin-top: 24px;
+}
+
+.profile-achievements-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.profile-achievement-count {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-weight: 800;
+}
+
+.profile-achievement-list {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.profile-achievement {
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.profile-achievement-icon {
+    font-size: 1.7rem;
+    line-height: 1;
+}
+
+.profile-achievement-title {
+    margin-top: 9px;
+    font-weight: 800;
+}
+
+.profile-achievement-description {
+    margin-top: 5px;
+    font-size: 0.82rem;
+    opacity: 0.62;
+    line-height: 1.45;
+}
+
+.profile-achievement-empty {
+    grid-column: 1 / -1;
+    padding: 20px;
+    text-align: center;
+    border-radius: 14px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    opacity: 0.55;
+}
+
+.achievement-unlock-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(1.04);
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+
+.achievement-unlock-overlay.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.achievement-unlock-card {
+    width: min(380px, calc(100% - 32px));
+    padding: 28px;
+    border-radius: 18px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(8, 10, 18, 0.95);
+    box-shadow:
+        0 25px 90px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(16px);
+}
+
+.achievement-unlock-icon {
+    font-size: 3rem;
+    line-height: 1;
+}
+
+.achievement-unlock-kicker {
+    margin-top: 10px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    opacity: 0.55;
+}
+
+.achievement-unlock-title {
+    margin-top: 7px;
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+
+.achievement-unlock-description {
+    margin-top: 6px;
+    opacity: 0.65;
+}
+
+@media (max-width: 760px) {
+
+    .profile-stats {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .profile-achievement-list {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-header {
+        flex-direction: column;
+    }
+
+}
+
+
+/* ACHIEVEMENT CARD UPGRADE */
+
+.profile-achievement {
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform 0.2s ease,
+        opacity 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.profile-achievement:hover {
+    transform: translateY(-2px);
+}
+
+.profile-achievement.is-locked {
+    opacity: 0.58;
+}
+
+.profile-achievement.is-unlocked {
+    opacity: 1;
+}
+
+.profile-achievement-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-achievement-rarity {
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    opacity: 0.65;
+}
+
+.profile-achievement-status {
+    margin-left: auto;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+}
+
+.profile-achievement.is-unlocked
+.profile-achievement-status {
+    opacity: 1;
+}
+
+.achievement-progress-track {
+    width: 100%;
+    height: 6px;
+    margin-top: 14px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.achievement-progress-bar {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.45s ease;
+    background: currentColor;
+}
+
+.achievement-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 7px;
+    font-size: 0.68rem;
+    opacity: 0.62;
+}
+
+.rarity-common .achievement-progress-bar {
+    opacity: 0.72;
+}
+
+.rarity-rare .achievement-progress-bar {
+    opacity: 0.85;
+}
+
+.rarity-epic .achievement-progress-bar {
+    opacity: 0.95;
+}
+
+.rarity-legendary .achievement-progress-bar {
+    opacity: 1;
+}
+
+.profile-achievement.is-locked
+.profile-achievement-icon {
+    filter: grayscale(1);
+    opacity: 0.6;
+}
+
+.profile-achievement.is-unlocked
+.profile-achievement-icon {
+    opacity: 1;
+}`r`n

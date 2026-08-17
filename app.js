@@ -523,6 +523,12 @@ const profileXp =
 const profileAchievements =
     $("profileAchievements");
 
+const profileAchievementCount =
+    $("profileAchievementCount");
+
+const profileAchievementList =
+    $("profileAchievementList");
+
 const logoutButton =
     $("logoutButton");
 
@@ -926,83 +932,377 @@ async function apiRequest(
 
 function displayProfile(player) {
 
-    /*
-        IMPORTANT:
-        We deliberately do not directly assume that
-        every profile element exists. This prevents
-        the "Cannot read properties of null" error.
-    */
+    hideElement(accountAuthArea);
 
-
-    hideElement(
-        accountAuthArea
-    );
-
-
-    showElement(
-        profileArea
-    );
-
+    showElement(profileArea);
 
     if (profileUsername) {
-
         profileUsername.textContent =
-            player.username || "PLAYER";
-
+            player?.username || "PLAYER";
     }
-
 
     if (profilePlayerId) {
-
         profilePlayerId.textContent =
-            `PLAYER #${player.id ?? "?"}`;
-
+            `PLAYER #${player?.id ?? "?"}`;
     }
-
 
     if (profileEmail) {
-
         profileEmail.textContent =
-            player.email || "UNKNOWN";
-
+            player?.email || "UNKNOWN";
     }
-
 
     if (profileLevel) {
-
         profileLevel.textContent =
-            player.level ?? 1;
-
+            player?.level ?? 1;
     }
-
 
     if (profileXp) {
-
         profileXp.textContent =
-            player.xp ?? 0;
-
+            formatNumber(player?.xp ?? 0);
     }
-
-
-    if (profileAchievements) {
-
-        profileAchievements.textContent =
-            player.achievements ?? 0;
-
-    }
-
 
     if (profileCreated) {
-
         profileCreated.textContent =
-            formatDate(
-                player.created_at
-            );
-
+            formatDate(player?.created_at);
     }
 
+    const badges =
+        Array.isArray(player?.achievement_badges)
+            ? player.achievement_badges
+            : [];
+
+    if (profileAchievements) {
+        profileAchievements.textContent =
+            String(player?.achievements ?? badges.length);
+    }
+
+    if (profileAchievementCount) {
+        profileAchievementCount.textContent =
+            String(player?.achievements ?? badges.length);
+    }
+
+    if (profileAchievementList) {
+
+        if (!badges.length) {
+
+            profileAchievementList.innerHTML = `
+                <div class="profile-achievement-empty">
+                    No achievements available yet.
+                </div>
+            `;
+
+        } else {
+
+            profileAchievementList.innerHTML =
+                badges.map((badge) => {
+
+                    const current =
+                        Math.max(
+                            0,
+                            Number(badge?.current ?? 0)
+                        );
+
+                    const target =
+                        Math.max(
+                            1,
+                            Number(badge?.target ?? 1)
+                        );
+
+                    const progress =
+                        Math.min(
+                            100,
+                            Math.max(
+                                0,
+                                Number(
+                                    badge?.progress_percent ?? 0
+                                )
+                            )
+                        );
+
+                    const unlocked =
+                        badge?.unlocked === true;
+
+                    const rarity =
+                        String(
+                            badge?.rarity || "COMMON"
+                        ).toUpperCase();
+
+                    const statusText =
+                        unlocked
+                            ? "UNLOCKED"
+                            : "LOCKED";
+
+                    const progressText =
+                        unlocked
+                            ? "UNLOCKED"
+                            : `${formatNumber(
+                                Math.min(current, target)
+                            )} / ${formatNumber(target)}`;
+
+                    return `
+                        <article
+                            class="
+                                profile-achievement
+                                ${unlocked ? "is-unlocked" : "is-locked"}
+                                rarity-${rarity.toLowerCase()}
+                            "
+                        >
+
+                            <div class="profile-achievement-top">
+
+                                <div
+                                    class="profile-achievement-icon"
+                                >
+                                    ${escapeHtml(
+                                        badge?.icon || "🏆"
+                                    )}
+                                </div>
+
+                                <div
+                                    class="profile-achievement-rarity"
+                                >
+                                    ${escapeHtml(rarity)}
+                                </div>
+
+                                <div
+                                    class="profile-achievement-status"
+                                >
+                                    ${statusText}
+                                </div>
+
+                            </div>
+
+                            <div
+                                class="profile-achievement-title"
+                            >
+                                ${escapeHtml(
+                                    badge?.title ||
+                                    "Achievement"
+                                )}
+                            </div>
+
+                            <div
+                                class="profile-achievement-description"
+                            >
+                                ${escapeHtml(
+                                    badge?.description || ""
+                                )}
+                            </div>
+
+                            <div
+                                class="achievement-progress-track"
+                            >
+                                <div
+                                    class="achievement-progress-bar"
+                                    style="width: ${progress}%"
+                                ></div>
+                            </div>
+
+                            <div
+                                class="achievement-progress-meta"
+                            >
+                                <span>
+                                    ${progressText}
+                                </span>
+
+                                <span>
+                                    ${progress}%
+                                </span>
+                            </div>
+
+                        </article>
+                    `;
+
+                }).join("");
+        }
+    }
+
+
+    showNewAchievementNotification(
+        badges
+    );
 }
 
+
+function showNewAchievementNotification(
+    badges
+) {
+    if (!Array.isArray(badges) || !badges.length) {
+        return;
+    }
+
+    const unlockedBadges =
+        badges.filter(
+            (badge) =>
+                badge?.unlocked === true &&
+                badge?.achievement_key
+        );
+
+    if (!unlockedBadges.length) {
+        return;
+    }
+
+    const knownKeys =
+        getStoredAchievementKeys();
+
+    const newBadges =
+        unlockedBadges.filter(
+            (badge) =>
+                !knownKeys.has(
+                    badge.achievement_key
+                )
+        );
+
+    saveAchievementKeys(
+        unlockedBadges
+    );
+
+    if (!newBadges.length) {
+        return;
+    }
+
+    showAchievementUnlock(
+        newBadges[0]
+    );
+}
+
+
+function showAchievementUnlock(
+    achievement
+) {
+    if (!achievement) {
+        return;
+    }
+
+    let overlay =
+        $("achievementUnlockOverlay");
+
+    if (!overlay) {
+
+        overlay =
+            document.createElement("div");
+
+        overlay.id =
+            "achievementUnlockOverlay";
+
+        overlay.className =
+            "achievement-unlock-overlay";
+
+        document.body.appendChild(
+            overlay
+        );
+    }
+
+    overlay.innerHTML = `
+        <div class="achievement-unlock-card">
+
+            <div class="achievement-unlock-icon">
+                ${escapeHtml(
+                    achievement.icon || "🏆"
+                )}
+            </div>
+
+            <div class="achievement-unlock-kicker">
+                ACHIEVEMENT UNLOCKED
+            </div>
+
+            <div class="achievement-unlock-title">
+                ${escapeHtml(
+                    achievement.title ||
+                    "New Achievement"
+                )}
+            </div>
+
+            <div class="achievement-unlock-description">
+                ${escapeHtml(
+                    achievement.description || ""
+                )}
+            </div>
+
+        </div>
+    `;
+
+    overlay.classList.remove(
+        "visible"
+    );
+
+    void overlay.offsetWidth;
+
+    overlay.classList.add(
+        "visible"
+    );
+
+    window.setTimeout(
+        () => {
+            overlay.classList.remove(
+                "visible"
+            );
+        },
+        2600
+    );
+}
+
+
+function getStoredAchievementKeys() {
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                "charliesGameAchievementKeys"
+            );
+
+        if (!raw) {
+            return new Set();
+        }
+
+        const parsed =
+            JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+            return new Set();
+        }
+
+        return new Set(parsed);
+
+    } catch (error) {
+
+        console.warn(
+            "Could not read stored achievement keys.",
+            error
+        );
+
+        return new Set();
+    }
+}
+
+
+function saveAchievementKeys(
+    badges
+) {
+    try {
+
+        const keys =
+            badges
+                .map(
+                    (badge) =>
+                        badge?.achievement_key
+                )
+                .filter(Boolean);
+
+        localStorage.setItem(
+            "charliesGameAchievementKeys",
+            JSON.stringify(keys)
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Could not save achievement keys.",
+            error
+        );
+    }
+}
 
 /* =========================================================
    FORMAT DATE
@@ -1957,12 +2257,75 @@ function getRoundConfig() {
 }
 
 function updateGameProgressFromPlayer(player) {
-    activeGameLevel = Number(player?.level ?? 1);
-    activeGameXp = Number(player?.xp ?? 0);
-    if (gameLevelElement) gameLevelElement.textContent = String(activeGameLevel);
-    if (gameXpElement) gameXpElement.textContent = `${formatNumber(activeGameXp)} XP`;
-}
+    const newLevel = Math.max(
+        1,
+        Number(player?.level ?? 1)
+    );
 
+    const newXp = Math.max(
+        0,
+        Number(player?.xp ?? 0)
+    );
+
+    const oldLevel = activeGameLevel;
+
+    activeGameLevel = newLevel;
+    activeGameXp = newXp;
+
+    const xpIntoLevel = newXp % 100;
+
+    const xpToNextLevel =
+        xpIntoLevel === 0
+            ? 100
+            : 100 - xpIntoLevel;
+
+    const progressPercent =
+        Math.min(
+            100,
+            Math.max(
+                0,
+                xpIntoLevel
+            )
+        );
+
+    if (gameLevelElement) {
+        gameLevelElement.textContent =
+            String(newLevel);
+    }
+
+    if (gameXpElement) {
+        gameXpElement.textContent =
+            `${formatNumber(xpIntoLevel)} / 100 XP`;
+    }
+
+    if (gameXpBarElement) {
+        gameXpBarElement.style.width =
+            `${progressPercent}%`;
+
+        gameXpBarElement.setAttribute(
+            "aria-valuenow",
+            String(xpIntoLevel)
+        );
+    }
+
+    if (gameXpNextElement) {
+        gameXpNextElement.textContent =
+            `${formatNumber(xpToNextLevel)} XP TO LEVEL ${newLevel + 1}`;
+    }
+
+    if (
+        oldLevel !== null &&
+        Number.isFinite(oldLevel) &&
+        newLevel > oldLevel
+    ) {
+        createLevelUpEffect(
+            oldLevel,
+            newLevel
+        );
+    }
+
+    previousGameLevel = newLevel;
+}
 function updateGameHud() {
     const config = getRoundConfig();
     if (gameScoreElement) gameScoreElement.textContent = formatNumber(activeGameScore);

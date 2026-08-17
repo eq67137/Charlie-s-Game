@@ -1285,6 +1285,154 @@
 
 
 
+
+    <!-- =========================================
+         PLAYER PROFILE
+         ========================================= -->
+
+    <section
+        id="profileArea"
+        class="player-profile-section"
+        style="display: none;"
+    >
+
+        <div class="profile-card">
+
+            <div class="profile-header">
+
+                <div>
+
+                    <div class="profile-kicker">
+                        PLAYER PROFILE
+                    </div>
+
+                    <h2 id="profileUsername">
+                        PLAYER
+                    </h2>
+
+                    <div
+                        id="profilePlayerId"
+                        class="profile-player-id"
+                    >
+                        PLAYER #?
+                    </div>
+
+                </div>
+
+                <button
+                    id="logoutButton"
+                    type="button"
+                    class="profile-logout"
+                >
+                    LOGOUT
+                </button>
+
+            </div>
+
+
+            <div class="profile-stats">
+
+                <div class="profile-stat">
+
+                    <span>LEVEL</span>
+
+                    <strong id="profileLevel">
+                        1
+                    </strong>
+
+                </div>
+
+
+                <div class="profile-stat">
+
+                    <span>XP</span>
+
+                    <strong id="profileXp">
+                        0
+                    </strong>
+
+                </div>
+
+
+                <div class="profile-stat">
+
+                    <span>ACHIEVEMENTS</span>
+
+                    <strong id="profileAchievements">
+                        0
+                    </strong>
+
+                </div>
+
+
+                <div class="profile-stat">
+
+                    <span>JOINED</span>
+
+                    <strong id="profileCreated">
+                        —
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="profile-contact">
+
+                <span>EMAIL</span>
+
+                <strong id="profileEmail">
+                    UNKNOWN
+                </strong>
+
+            </div>
+
+
+            <div class="profile-achievements">
+
+                <div class="profile-achievements-header">
+
+                    <div>
+
+                        <div class="profile-kicker">
+                            ACHIEVEMENTS
+                        </div>
+
+                        <h3>
+                            TROPHIES
+                        </h3>
+
+                    </div>
+
+                    <span
+                        id="profileAchievementCount"
+                        class="profile-achievement-count"
+                    >
+                        0
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="profileAchievementList"
+                    class="profile-achievement-list"
+                >
+
+                    <div class="profile-achievement-empty">
+                        No achievements unlocked yet.
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
     <!-- =========================================
          PLAY ARENA
          ========================================= -->
@@ -1330,10 +1478,20 @@
                     <strong id="gameCombo">x1</strong>
                     <small id="gameComboBest">BEST x1</small>
                 </div>
-                <div class="game-stat">
+                <div class="game-stat game-level-stat">
                     <span>LEVEL</span>
                     <strong id="gameLevel">1</strong>
-                    <small id="gameXp">0 XP</small>
+
+                    <div class="game-xp-track" aria-label="Experience progress">
+                        <div
+                            id="gameXpBar"
+                            class="game-xp-fill"
+                            style="width: 0%;"
+                        ></div>
+                    </div>
+
+                    <small id="gameXp">0 / 100 XP</small>
+                    <small id="gameXpNext">100 XP TO LEVEL 2</small>
                 </div>
                 <div class="game-stat">
                     <span>SESSION</span>
