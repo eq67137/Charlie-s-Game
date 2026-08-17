@@ -5,6 +5,9 @@ import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 
+import psycopg
+from psycopg.rows import dict_row
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
@@ -16,40 +19,34 @@ from pwdlib import PasswordHash
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+
 DATABASE_PATH = BASE_DIR / "database.db"
 
-# ------------------------------------------------------------
-# Development settings
-# ------------------------------------------------------------
+# When DATABASE_URL exists, PostgreSQL is used.
+# When it does not exist, SQLite is used.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
-# Keep this TRUE while you are testing the game locally.
-#
-# Before publishing publicly, change it to FALSE or set the
-# environment variable:
-#
-#   CHARLIE_ENABLE_DEV_XP=false
-#
+USE_POSTGRES = bool(DATABASE_URL)
+
+
+# ============================================================
+# DEVELOPMENT XP CONFIGURATION
+# ============================================================
+
 ENABLE_DEV_XP_ENDPOINT = (
-    os.getenv("CHARLIE_ENABLE_DEV_XP", "true").strip().lower()
+    os.getenv(
+        "CHARLIE_ENABLE_DEV_XP",
+        "true",
+    )
+    .strip()
+    .lower()
     == "true"
 )
 
-# ------------------------------------------------------------
-# CORS
-# ------------------------------------------------------------
-#
-# Local development:
-#   http://127.0.0.1:5500
-#   http://localhost:5500
-#   http://127.0.0.1:8000
-#   http://localhost:8000
-#
-# For production, set:
-#
-#   CHARLIE_CORS_ORIGINS=https://your-domain.com
-#
-# Multiple origins can be separated with commas.
-#
+
+# ============================================================
+# CORS CONFIGURATION
+# ============================================================
 
 DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:5500,"
@@ -76,10 +73,27 @@ password_hash = PasswordHash.recommended()
 
 
 # ============================================================
-# DATABASE
+# DATABASE CONNECTION
 # ============================================================
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
+    """
+    Returns either:
+
+        SQLite connection
+    or:
+        PostgreSQL connection
+
+    depending on whether DATABASE_URL exists.
+    """
+
+    if USE_POSTGRES:
+        return psycopg.connect(
+            DATABASE_URL,
+            row_factory=dict_row,
+            connect_timeout=10,
+        )
+
     connection = sqlite3.connect(
         DATABASE_PATH,
         timeout=10,
@@ -87,17 +101,47 @@ def get_connection() -> sqlite3.Connection:
 
     connection.row_factory = sqlite3.Row
 
+    # Make sure foreign keys are enforced in SQLite.
+    connection.execute(
+        "PRAGMA foreign_keys = ON"
+    )
+
     return connection
 
 
-def initialize_database() -> None:
+def execute_query(
+    connection,
+    query: str,
+    params=(),
+):
+    """
+    Execute a query using syntax compatible with
+    both SQLite (?) and PostgreSQL (%s).
+
+    Our application SQL uses ? placeholders.
+    They are converted automatically for PostgreSQL.
+    """
+
+    if USE_POSTGRES:
+        query = query.replace(
+            "?",
+            "%s",
+        )
+
+    return connection.execute(
+        query,
+        params,
+    )
+
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
+
+def initialize_sqlite_database() -> None:
     connection = get_connection()
 
     try:
-        # ----------------------------------------------------
-        # Players table
-        # ----------------------------------------------------
-
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS players (
@@ -114,10 +158,6 @@ def initialize_database() -> None:
         )
 
         connection.commit()
-
-        # ----------------------------------------------------
-        # Upgrade older databases automatically
-        # ----------------------------------------------------
 
         existing_columns = {
             row["name"]
@@ -152,10 +192,6 @@ def initialize_database() -> None:
 
         connection.commit()
 
-        # ----------------------------------------------------
-        # Game sessions table
-        # ----------------------------------------------------
-
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS game_sessions (
@@ -177,18 +213,95 @@ def initialize_database() -> None:
         connection.close()
 
 
+def initialize_postgres_database() -> None:
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS players (
+                id SERIAL PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                level INTEGER NOT NULL DEFAULT 1,
+                xp INTEGER NOT NULL DEFAULT 0,
+                achievements INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE players
+            ADD COLUMN IF NOT EXISTS level
+            INTEGER NOT NULL DEFAULT 1
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE players
+            ADD COLUMN IF NOT EXISTS xp
+            INTEGER NOT NULL DEFAULT 0
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE players
+            ADD COLUMN IF NOT EXISTS achievements
+            INTEGER NOT NULL DEFAULT 0
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS game_sessions (
+                id TEXT PRIMARY KEY,
+                player_id INTEGER NOT NULL,
+                started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP,
+                score INTEGER,
+                submitted BOOLEAN NOT NULL DEFAULT FALSE,
+                FOREIGN KEY (player_id)
+                    REFERENCES players(id)
+            )
+            """
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+
+def initialize_database() -> None:
+    """
+    Initialize whichever database the application is using.
+    """
+
+    if USE_POSTGRES:
+        initialize_postgres_database()
+    else:
+        initialize_sqlite_database()
+
+
 # ============================================================
 # FASTAPI LIFESPAN
 # ============================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Runs once when the application starts.
-    Replaces the deprecated @app.on_event("startup").
-    """
-
     initialize_database()
+
+    print(
+        "Database:",
+        "PostgreSQL"
+        if USE_POSTGRES
+        else "SQLite",
+    )
 
     yield
 
@@ -212,7 +325,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=[
+        "GET",
+        "POST",
+        "OPTIONS",
+    ],
     allow_headers=["*"],
 )
 
@@ -332,6 +449,7 @@ def calculate_level(total_xp: int) -> int:
     Every 100 XP advances one level.
 
     Examples:
+
         0 XP   -> Level 1
         99 XP  -> Level 1
         100 XP -> Level 2
@@ -344,11 +462,13 @@ def calculate_level(total_xp: int) -> int:
     return (total_xp // 100) + 1
 
 
-def calculate_achievement_count(current_xp: int) -> int:
+def calculate_achievement_count(
+    current_xp: int,
+) -> int:
     """
     Temporary achievement calculation.
 
-    Every 500 XP counts as one achievement.
+    Every 500 XP = 1 achievement.
     """
 
     if current_xp < 0:
@@ -357,13 +477,15 @@ def calculate_achievement_count(current_xp: int) -> int:
     return current_xp // 500
 
 
-def calculate_xp_from_score(score: int) -> int:
+def calculate_xp_from_score(
+    score: int,
+) -> int:
     """
     Temporary scoring rule:
 
-        Every 10 score points = 1 XP
+        every 10 score points = 1 XP
 
-    Maximum XP awarded from one game session:
+    Maximum XP from a single game:
         1000 XP
     """
 
@@ -381,10 +503,11 @@ def calculate_xp_from_score(score: int) -> int:
 # ============================================================
 
 def get_player_stats(
-    connection: sqlite3.Connection,
+    connection,
     player_id: int,
 ):
-    return connection.execute(
+    return execute_query(
+        connection,
         """
         SELECT
             id,
@@ -403,16 +526,11 @@ def get_player_stats(
 
 
 def get_public_player_stats(
-    connection: sqlite3.Connection,
+    connection,
     player_id: int,
 ):
-    """
-    Returns public-safe player information.
-
-    Email is intentionally excluded from this helper.
-    """
-
-    return connection.execute(
+    return execute_query(
+        connection,
         """
         SELECT
             id,
@@ -447,9 +565,16 @@ def status():
         "game": "Charlie's Game",
         "server": "online",
         "version": "1.0.0",
-        "environment": "development"
-        if ENABLE_DEV_XP_ENDPOINT
-        else "production",
+        "database": (
+            "postgresql"
+            if USE_POSTGRES
+            else "sqlite"
+        ),
+        "environment": (
+            "production"
+            if USE_POSTGRES
+            else "development"
+        ),
     }
 
 
@@ -458,8 +583,9 @@ def status():
 # ============================================================
 
 @app.post("/api/register")
-def register_player(request: RegisterRequest):
-
+def register_player(
+    request: RegisterRequest,
+):
     username = validate_username(
         request.username
     )
@@ -479,8 +605,8 @@ def register_player(request: RegisterRequest):
     connection = get_connection()
 
     try:
-
-        existing = connection.execute(
+        existing = execute_query(
+            connection,
             """
             SELECT id
             FROM players
@@ -503,28 +629,59 @@ def register_player(request: RegisterRequest):
                 ),
             )
 
-        cursor = connection.execute(
-            """
-            INSERT INTO players (
-                username,
-                email,
-                password_hash,
-                level,
-                xp,
-                achievements
+        if USE_POSTGRES:
+            cursor = connection.execute(
+                """
+                INSERT INTO players (
+                    username,
+                    email,
+                    password_hash,
+                    level,
+                    xp,
+                    achievements
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    1,
+                    0,
+                    0
+                )
+                RETURNING id
+                """,
+                (
+                    username,
+                    email,
+                    hashed_password,
+                ),
             )
-            VALUES (?, ?, ?, 1, 0, 0)
-            """,
-            (
-                username,
-                email,
-                hashed_password,
-            ),
-        )
+
+            player_id = cursor.fetchone()["id"]
+
+        else:
+            cursor = connection.execute(
+                """
+                INSERT INTO players (
+                    username,
+                    email,
+                    password_hash,
+                    level,
+                    xp,
+                    achievements
+                )
+                VALUES (?, ?, ?, 1, 0, 0)
+                """,
+                (
+                    username,
+                    email,
+                    hashed_password,
+                ),
+            )
+
+            player_id = cursor.lastrowid
 
         connection.commit()
-
-        player_id = cursor.lastrowid
 
         player = get_player_stats(
             connection,
@@ -537,15 +694,16 @@ def register_player(request: RegisterRequest):
             "player": dict(player),
         }
 
-    except sqlite3.IntegrityError:
+    except HTTPException:
+        connection.rollback()
+        raise
+
+    except Exception:
         connection.rollback()
 
         raise HTTPException(
-            status_code=409,
-            detail=(
-                "An account with that username "
-                "or email already exists."
-            ),
+            status_code=500,
+            detail="Unable to create account.",
         )
 
     finally:
@@ -557,8 +715,9 @@ def register_player(request: RegisterRequest):
 # ============================================================
 
 @app.post("/api/login")
-def login_player(request: LoginRequest):
-
+def login_player(
+    request: LoginRequest,
+):
     email = sanitize_email(
         request.email
     )
@@ -566,8 +725,8 @@ def login_player(request: LoginRequest):
     connection = get_connection()
 
     try:
-
-        player = connection.execute(
+        player = execute_query(
+            connection,
             """
             SELECT
                 id,
@@ -625,8 +784,9 @@ def login_player(request: LoginRequest):
 # ============================================================
 
 @app.get("/api/player/{player_id}")
-def get_player(player_id: int):
-
+def get_player(
+    player_id: int,
+):
     if player_id <= 0:
         raise HTTPException(
             status_code=400,
@@ -636,7 +796,6 @@ def get_player(player_id: int):
     connection = get_connection()
 
     try:
-
         player = get_public_player_stats(
             connection,
             player_id,
@@ -669,14 +828,11 @@ def add_player_xp(
     """
     Development/testing endpoint.
 
-    IMPORTANT:
-    This endpoint should be disabled before public deployment.
+    Keep this enabled locally.
 
-    Set:
+    Before public deployment:
 
         CHARLIE_ENABLE_DEV_XP=false
-
-    when publishing the game.
     """
 
     if not ENABLE_DEV_XP_ENDPOINT:
@@ -700,7 +856,6 @@ def add_player_xp(
     connection = get_connection()
 
     try:
-
         player = get_player_stats(
             connection,
             player_id,
@@ -721,11 +876,14 @@ def add_player_xp(
             new_xp
         )
 
-        new_achievements = calculate_achievement_count(
-            new_xp
+        new_achievements = (
+            calculate_achievement_count(
+                new_xp
+            )
         )
 
-        connection.execute(
+        execute_query(
+            connection,
             """
             UPDATE players
             SET
@@ -764,15 +922,9 @@ def add_player_xp(
 # ============================================================
 
 @app.post("/api/game/start")
-def start_game(request: StartGameRequest):
-    """
-    Creates a one-time game session for a player.
-
-    The frontend currently supplies player_id.
-    Authentication can be strengthened later without
-    changing the database structure.
-    """
-
+def start_game(
+    request: StartGameRequest,
+):
     if request.player_id <= 0:
         raise HTTPException(
             status_code=400,
@@ -782,7 +934,6 @@ def start_game(request: StartGameRequest):
     connection = get_connection()
 
     try:
-
         player = get_public_player_stats(
             connection,
             request.player_id,
@@ -798,7 +949,8 @@ def start_game(request: StartGameRequest):
             32
         )
 
-        connection.execute(
+        execute_query(
+            connection,
             """
             INSERT INTO game_sessions (
                 id,
@@ -833,11 +985,6 @@ def start_game(request: StartGameRequest):
 def submit_game_score(
     request: SubmitScoreRequest,
 ):
-    """
-    Submit one final score for a previously
-    created game session.
-    """
-
     score = request.score
 
     if score < 0:
@@ -855,12 +1002,8 @@ def submit_game_score(
     connection = get_connection()
 
     try:
-
-        # ----------------------------------------------------
-        # Get game session
-        # ----------------------------------------------------
-
-        session = connection.execute(
+        session = execute_query(
+            connection,
             """
             SELECT
                 id,
@@ -888,10 +1031,6 @@ def submit_game_score(
                 ),
             )
 
-        # ----------------------------------------------------
-        # Get player
-        # ----------------------------------------------------
-
         player = get_player_stats(
             connection,
             session["player_id"],
@@ -902,10 +1041,6 @@ def submit_game_score(
                 status_code=404,
                 detail="Player not found.",
             )
-
-        # ----------------------------------------------------
-        # Calculate XP on the server
-        # ----------------------------------------------------
 
         awarded_xp = calculate_xp_from_score(
             score
@@ -926,11 +1061,8 @@ def submit_game_score(
             )
         )
 
-        # ----------------------------------------------------
-        # Update player
-        # ----------------------------------------------------
-
-        connection.execute(
+        execute_query(
+            connection,
             """
             UPDATE players
             SET
@@ -947,30 +1079,25 @@ def submit_game_score(
             ),
         )
 
-        # ----------------------------------------------------
-        # Complete game session
-        # ----------------------------------------------------
-
-        cursor = connection.execute(
+        cursor = execute_query(
+            connection,
             """
             UPDATE game_sessions
             SET
                 ended_at = CURRENT_TIMESTAMP,
                 score = ?,
-                submitted = 1
+                submitted = ?
             WHERE
                 id = ?
-                AND submitted = 0
+                AND submitted = ?
             """,
             (
                 score,
+                False if USE_POSTGRES else 1,
                 request.session_id,
+                False if USE_POSTGRES else 0,
             ),
         )
-
-        # ----------------------------------------------------
-        # Extra protection against duplicate submission
-        # ----------------------------------------------------
 
         if cursor.rowcount != 1:
             connection.rollback()
@@ -983,11 +1110,19 @@ def submit_game_score(
                 ),
             )
 
-        connection.commit()
+        # For PostgreSQL the Python value must be boolean.
+        if USE_POSTGRES:
+            execute_query(
+                connection,
+                """
+                UPDATE game_sessions
+                SET submitted = TRUE
+                WHERE id = ?
+                """,
+                (request.session_id,),
+            )
 
-        # ----------------------------------------------------
-        # Return updated player
-        # ----------------------------------------------------
+        connection.commit()
 
         updated_player = get_player_stats(
             connection,
@@ -1002,6 +1137,10 @@ def submit_game_score(
             "player": dict(updated_player),
         }
 
+    except HTTPException:
+        connection.rollback()
+        raise
+
     finally:
         connection.close()
 
@@ -1012,12 +1151,11 @@ def submit_game_score(
 
 @app.get("/api/leaderboard")
 def leaderboard():
-
     connection = get_connection()
 
     try:
-
-        players = connection.execute(
+        players = execute_query(
+            connection,
             """
             SELECT
                 id,
@@ -1031,7 +1169,7 @@ def leaderboard():
                 level DESC,
                 username ASC
             LIMIT 100
-            """
+            """,
         ).fetchall()
 
         result = []

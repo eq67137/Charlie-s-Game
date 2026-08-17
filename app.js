@@ -3,7 +3,7 @@
    FRONTEND APPLICATION
    ========================================================= */
 
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : 'https://YOUR-BACKEND-DOMAIN.com';
+const API_BASE_URL = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : 'https://YOUR-BACKEND-DOMAIN.com';
 
 
 /* =========================================================
@@ -1579,7 +1579,7 @@ const leaderboardPodium = $("leaderboardPodium");
 const leaderboardStatus = $("leaderboardStatus");
 const refreshLeaderboardButton = $("refreshLeaderboardButton");
 
-const leaderboardMedals = ["ðŸ¥‡", "ðŸ¥ˆ", "ðŸ¥‰"];
+const leaderboardMedals = [String.fromCodePoint(0x1F947), String.fromCodePoint(0x1F948), String.fromCodePoint(0x1F949)];
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -1633,7 +1633,7 @@ function renderPodium(players) {
                     ${escapeHtml(player.username)}
                 </div>
                 <div class="podium-stats">
-                    SCORE ${formatNumber(player.total_score)} Â· LV ${formatNumber(player.level)} Â· ${formatNumber(player.xp)} XP
+                    SCORE ${formatNumber(player.total_score)} ${String.fromCodePoint(0x00B7)} LV ${formatNumber(player.level)} ${String.fromCodePoint(0x00B7)} ${formatNumber(player.xp)} XP
                 </div>
             </article>
         `;
@@ -1694,7 +1694,7 @@ async function loadLeaderboard() {
 
     if (refreshLeaderboardButton) {
         refreshLeaderboardButton.disabled = true;
-        refreshLeaderboardButton.textContent = "â†» LOADING...";
+        refreshLeaderboardButton.textContent = String.fromCodePoint(0x21D2) + " LOADING...";
     }
 
     try {
@@ -1707,7 +1707,7 @@ async function loadLeaderboard() {
         renderLeaderboard(result.players);
 
         if (leaderboardStatus) {
-            leaderboardStatus.textContent = `${result.players.length} PLAYERS â€¢ SERVER ONLINE`;
+            leaderboardStatus.textContent = `${result.players.length} PLAYERS ${String.fromCodePoint(0x2022)} SERVER ONLINE`;
             leaderboardStatus.classList.add("online");
         }
     } catch (error) {
@@ -1734,7 +1734,7 @@ async function loadLeaderboard() {
     } finally {
         if (refreshLeaderboardButton) {
             refreshLeaderboardButton.disabled = false;
-            refreshLeaderboardButton.textContent = "â†» REFRESH";
+        refreshLeaderboardButton.textContent = String.fromCodePoint(0x21D2) + " REFRESH";
         }
     }
 }
@@ -2188,8 +2188,8 @@ function registerTargetHit(event) {
     const awardedScore = config.points * multiplier;
     activeGameScore = Math.max(0, activeGameScore + awardedScore);
 
-    if (gameScoreDelta) gameScoreDelta.textContent = `+${awardedScore} â€¢ x${multiplier}`;
-    if (gameResult) gameResult.textContent = `${config.name} â€¢ +${awardedScore} â€¢ COMBO x${multiplier}`;
+    if (gameScoreDelta) gameScoreDelta.textContent = `+${awardedScore} ${String.fromCodePoint(0x2022)} x${multiplier}`;
+    if (gameResult) gameResult.textContent = `${config.name} ${String.fromCodePoint(0x2022)} +${awardedScore} ${String.fromCodePoint(0x2022)} COMBO x${multiplier}`;
     flashHit(event);
     updateGameHud();
     moveGameTarget();
@@ -2242,7 +2242,7 @@ async function finishPlayableGame() {
         updateAccountButton();
         updateGameProgressFromPlayer(result.player);
         if (gameSessionState) gameSessionState.textContent = "COMPLETE";
-        if (gameResult) gameResult.textContent = `RUN COMPLETE â€¢ ${formatNumber(activeGameScore)} SCORE â€¢ +${formatNumber(result.awarded_xp)} XP`;
+        if (gameResult) gameResult.textContent = `RUN COMPLETE ${String.fromCodePoint(0x2022)} ${formatNumber(activeGameScore)} SCORE ${String.fromCodePoint(0x2022)} +${formatNumber(result.awarded_xp)} XP`;
 
         if (resultScore) resultScore.textContent = formatNumber(activeGameScore);
         if (resultXp) resultXp.textContent = formatNumber(result.awarded_xp);
@@ -2308,6 +2308,9 @@ window.addEventListener("charliesGamePlayerChanged", () => {
     if (gamePlayerName) gamePlayerName.textContent = player?.username?.toUpperCase() || "PLAYER";
     if (!gameRunning && !gameSubmitting && player) updateGameProgressFromPlayer(player);
 });
+
+
+
 
 
 
