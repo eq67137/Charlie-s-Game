@@ -1112,7 +1112,7 @@ def add_player_xp(
         return {
             "success": True,
             "message": "XP added successfully!",
-                        "player": {
+            "player": {
                 **dict(updated_player),
                 "achievement_badges": achievement_badges,
             },
@@ -1260,10 +1260,14 @@ def submit_game_score(
             new_xp
         )
 
-        new_achievements = (
-            calculate_achievement_count(
-                new_xp
-            )
+        projected_player = dict(player)
+        projected_player["xp"] = new_xp
+        projected_player["level"] = new_level
+
+        new_achievements = calculate_achievement_count(
+            connection,
+            session["player_id"],
+            projected_player,
         )
 
         execute_query(
