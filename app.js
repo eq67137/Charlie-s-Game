@@ -3,7 +3,7 @@
    FRONTEND APPLICATION
    ========================================================= */
 
-const API_BASE_URL = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : 'https://YOUR-BACKEND-DOMAIN.com';
+const API_BASE_URL = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8000' : 'https://charlie-s-game.onrender.com';
 
 
 /* =========================================================
@@ -2308,6 +2308,7 @@ window.addEventListener("charliesGamePlayerChanged", () => {
     if (gamePlayerName) gamePlayerName.textContent = player?.username?.toUpperCase() || "PLAYER";
     if (!gameRunning && !gameSubmitting && player) updateGameProgressFromPlayer(player);
 });
+
 
 
 
