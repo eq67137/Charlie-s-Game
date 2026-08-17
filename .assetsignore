@@ -1,0 +1,14 @@
+backend/
+backup/
+.git/
+*.py
+*.pyc
+*.db
+*_before_*
+install_*.py
+update_*.py
+upgrade_*.py
+fix_*.py
+*.bat
+wrangler.jsonc
+.assetsignore
